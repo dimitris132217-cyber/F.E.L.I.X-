@@ -369,6 +369,45 @@ body{
     padding: 0.35rem 0;
   }
 }
+
+/* ---------- Google Translate CSS Injection ---------- */
+#google_translate_element {
+  margin-top: 6px;
+  display: inline-block;
+  pointer-events: auto;
+}
+
+.goog-te-gadget-simple {
+  background-color: var(--panel) !important;
+  border: 1px solid var(--line) !important;
+  padding: 4px 8px !important;
+  border-radius: 4px !important;
+  font-family: var(--font-mono) !important;
+  font-size: 11px !important;
+  cursor: pointer;
+}
+
+.goog-te-gadget-simple .goog-te-menu-value {
+  color: var(--ink-dim) !important;
+}
+
+.goog-te-gadget-simple .goog-te-menu-value span {
+  color: var(--ink-dim) !important;
+  font-family: var(--font-mono) !important;
+}
+
+.goog-te-gadget-icon {
+  display: none !important;
+}
+
+body {
+  top: 0px !important;
+}
+
+.goog-te-banner-frame,
+#goog-gt-tt {
+  display: none !important;
+}
 </style>
 </head>
 <body>
@@ -377,7 +416,10 @@ body{
 
 <div class="chrome">
   <div class="wordmark"><span class="dot"></span>FELIX</div>
-  <div class="meta">MODEL K1</div>
+  <div class="meta">
+    <div>MODEL K1</div>
+    <div id="google_translate_element"></div>
+  </div>
 </div>
 <div class="dot-nav" id="dotNav">
   <span class="active"></span><span></span><span></span><span></span><span></span><span></span><span></span>
@@ -1107,6 +1149,19 @@ body{
   update();
 })();
 </script>
+
+<!-- Google Translate Initialization Script -->
+<script type="text/javascript">
+  function googleTranslateElementInit() {
+    new google.translate.TranslateElement({
+      pageLanguage: 'en',
+      includedLanguages: 'en,el',
+      layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
+      autoDisplay: false
+    }, 'google_translate_element');
+  }
+</script>
+<script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
 
 </body>
 </html>
