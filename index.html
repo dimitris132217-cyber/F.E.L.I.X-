@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kestrel — Model K1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #07090A;
+    --panel: #10161A;
+    --ink: #F2F5F2;
+    --ink-dim: #8FA09A;
+    --accent: #6FF3D9;
+    --accent-soft: rgba(111,243,217,0.14);
+    --line: rgba(242,245,242,0.12);
+    --joint: #FF8A4C;
+    --font-display: 'Space Grotesk', 'Helvetica Neue', Arial, sans-serif;
+    --font-mono: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+  }
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; padding:0; height:100%; background: var(--bg); }
+  body{
+    color: var(--ink);
+    font-family: var(--font-display);
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection{ background: var(--accent); color: #06201C; }
+  .accent{ color: var(--accent); }
+
+  /* film grain, fixed over everything */
+  .grain{
+    position: fixed; inset: -10%; z-index: 90; pointer-events:none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='matrix' values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.5 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+    opacity: 0.05;
+    mix-blend-mode: overlay;
+  }
+
+  /* ---------- Persistent chrome ---------- */
+  .chrome{
+    position: fixed; inset: 0; z-index: 40; pointer-events: none;
+    padding: 28px 32px;
+    display:flex; justify-content:space-between; align-items:flex-start;
+    font-family: var(--font-mono); font-size: 12.5px; color: var(--ink-dim);
+  }
+  .chrome .wordmark{
+    font-family: var(--font-display); font-weight: 700; font-size: 16px; color: var(--ink);
+    display:flex; align-items:center; gap:9px; letter-spacing: 0.01em;
+  }
+  .chrome .wordmark .dot{ width:7px; height:7px; border-radius:50%; background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft), 0 0 14px var(--accent); animation: blink 2.4s ease-in-out infinite; }
+  @keyframes blink{ 0%,100%{ opacity:1; } 50%{ opacity:0.45; } }
+  .chrome .meta{ text-align:right; line-height:1.6; }
+  @media (max-width: 640px){ .chrome{ padding: 20px 18px; } .chrome .meta{ display:none; } }
+
+  .dot-nav{
+    position: fixed; right: 26px; top: 50%; transform: translateY(-50%);
+    z-index: 40; display:flex; flex-direction:column; gap: 14px;
+    pointer-events:none;
+  }
+  .dot-nav span{
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--line);
+    transition: background 0.4s ease, transform 0.4s ease, box-shadow 0.4s ease;
+  }
+  .dot-nav span.active{ background: var(--accent); transform: scale(1.8); box-shadow: 0 0 10px var(--accent); }
+  @media (max-width: 640px){ .dot-nav{ right: 14px; } }
+
+  .counter{
+    position: fixed; left: 32px; bottom: 28px; z-index: 40;
+    font-family: var(--font-mono); font-size: 12px; color: var(--ink-dim);
+    pointer-events:none;
+  }
+  @media (max-width: 640px){ .counter{ left: 18px; bottom: 20px; } }
+
+  /* ---------- Scroll container ---------- */
+  #scroller{
+    height: 100vh;
+    overflow-y: auto;
+    scroll-snap-type: y mandatory;
+    scroll-behavior: smooth;
+    scrollbar-width: none;
+  }
+  #scroller::-webkit-scrollbar{ display:none; }
+  .story{
+    height: 100vh;
+    scroll-snap-align: start;
+    position: relative;
+    overflow: hidden;
+    display:flex;
+    align-items:center;
+  }
+  .story-bg{
+    position:absolute; inset:0;
+    display:flex; align-items:center; justify-content:center;
+    perspective: 900px;
+    will-change: transform;
+  }
+  .story-bg > *{ will-change: transform; }
+  .story-copy{
+    position:relative; z-index: 5;
+    padding: 0 8vw;
+    max-width: 720px;
+    will-change: transform, opacity;
+  }
+  @media (max-width: 720px){ .story-copy{ padding: 0 24px; } }
+
+  .story h2{
+    font-size: clamp(30px, 6vw, 58px);
+    line-height: 1.08;
+    letter-spacing: -0.015em;
+    font-weight: 700;
+    margin: 0 0 16px;
+    overflow: hidden;
+  }
+  .story h2 span.line{ display:block; }
+  .story p.cap{
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--ink-dim);
+    margin: 0 0 14px;
+    display:flex; align-items:center; gap:9px;
+  }
+  .story p.cap .bar{ width:18px; height:1px; background: var(--accent); }
+  .story p.sub{
+    font-size: 15.5px; line-height:1.6; color: var(--ink-dim); max-width: 440px; margin:0;
+  }
+
+  .vignette{
+    position:absolute; inset:0;
+    background: radial-gradient(ellipse at 30% 50%, transparent 0%, rgba(7,9,10,0.55) 62%, rgba(7,9,10,0.95) 100%);
+    z-index: 2; pointer-events:none;
+  }
+  .grain-grid{
+    position:absolute; inset:0; z-index:1; opacity: 0.5;
+    background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size: 42px 42px;
+  }
+
+  /* ---------- Hero ---------- */
+  #hero-canvas{ position:absolute; inset:0; width:100%; height:100%; display:block; }
+  .hero-copy{ align-self: flex-end; padding-bottom: 9vh; }
+
+  .hud{ position:absolute; inset: 0; z-index: 4; pointer-events:none; font-family: var(--font-mono); }
+  .hud-corner{ position:absolute; width: 26px; height: 26px; border: 1px solid var(--accent); opacity: 0.55; }
+  .hud-corner.tl{ top: 26px; left: 26px; border-right:none; border-bottom:none; }
+  .hud-corner.tr{ top: 26px; right: 26px; border-left:none; border-bottom:none; }
+  .hud-corner.bl{ bottom: 26px; left: 26px; border-right:none; border-top:none; }
+  .hud-corner.br{ bottom: 26px; right: 26px; border-left:none; border-top:none; }
+  @media (max-width: 640px){ .hud-corner{ display:none; } }
+  .hud-telemetry{
+    position:absolute; top: 26px; right: 60px; text-align:right;
+    font-size: 11px; color: var(--accent); line-height: 1.9; opacity: 0.85;
+    text-shadow: 0 0 12px rgba(111,243,217,0.5);
+  }
+  @media (max-width: 640px){ .hud-telemetry{ display:none; } }
+  .hud-status{ transition: opacity 0.6s ease; }
+
+  /* ---------- Section 2: sensing radar ---------- */
+  .radar{ width: min(64vh, 64vw); height: min(64vh, 64vw); position:relative; opacity: 0.95; filter: drop-shadow(0 0 24px rgba(111,243,217,0.25)); }
+  .radar canvas{ width:100%; height:100%; display:block; }
+
+  /* ---------- Section 3: joint / recovery diagram ---------- */
+  .leg-diagram{ width: min(50vh, 80vw); opacity: 0.95; filter: drop-shadow(0 0 20px rgba(255,138,76,0.2)); }
+  .joint-dot{ animation: pulse 2.2s ease-in-out infinite; transform-origin: center; }
+  .joint-dot.j2{ animation-delay: 0.3s; }
+  .joint-dot.j3{ animation-delay: 0.6s; }
+  @keyframes pulse{ 0%,100%{ opacity:1; } 50%{ opacity:0.35; } }
+
+  /* ---------- Section 4: route diagram ---------- */
+  .route-diagram{ width: min(70vh, 86vw); overflow: visible; filter: drop-shadow(0 0 20px rgba(111,243,217,0.25)); }
+  .route-diagram text{ font-family: var(--font-mono); font-size: 12px; fill: var(--ink-dim); }
+  .route-diagram text.small{ font-size: 9px; }
+  .route-diagram .wn-c{ fill: var(--accent); }
+  .route-diagram .wn-p{ fill: var(--ink); }
+  .route-diagram .wn-o{ fill: var(--joint); font-size: 15px; }
+  .wn-ground{ stroke: var(--ink-dim); stroke-width: 1.5; }
+  .wn-strata{ fill: none; stroke: var(--line); stroke-width: 1; stroke-dasharray: 2 6; }
+  .wn-wire{ fill: none; stroke: var(--ink-dim); stroke-width: 1.5; }
+  .wn-part{ fill: var(--panel); stroke: var(--ink-dim); stroke-width: 1.5; }
+  .wn-dim{ fill: none; stroke: var(--ink-dim); stroke-width: 1; opacity: 0.6; }
+  .wn-rod-c, .wn-rod-p{ stroke-width: 4; stroke-linecap: round; }
+  .wn-rod-c{ stroke: var(--accent); }
+  .wn-rod-p{ stroke: var(--ink); }
+  .wn-cap-c, .wn-cap-p{ fill: var(--bg); stroke-width: 2; }
+  .wn-cap-c{ stroke: var(--accent); }
+  .wn-cap-p{ stroke: var(--ink); }
+  .wn-field{ fill: none; stroke: var(--accent); stroke-opacity: 0.12; stroke-width: 1; }
+  .route-path{ fill: none; stroke: var(--accent); stroke-width: 1.8; stroke-linecap: round; stroke-dasharray: 3 9; animation: flow 0.9s linear infinite; }
+  @keyframes flow{ to{ stroke-dashoffset: -12; } }
+  .wn-dot{ fill: var(--accent); }
+  .wn-tip{ transform-box: fill-box; transform-origin: center; animation: tip 2s ease-in-out infinite; }
+  @keyframes tip{ 0%,100%{ opacity: 1; transform: scale(1); } 50%{ opacity: 0.45; transform: scale(1.6); } }
+  .wn-needle{ stroke: var(--joint); stroke-width: 1.6; stroke-linecap: round; transform-origin: 250px 119px; animation: needle 3.2s ease-in-out infinite; }
+  @keyframes needle{ 0%,100%{ transform: rotate(-38deg); } 50%{ transform: rotate(34deg); } }
+  .wn-anomaly{ fill: var(--joint); fill-opacity: 0.14; stroke: var(--joint); stroke-width: 1.2; stroke-dasharray: 3 4; animation: anomaly 3.2s ease-in-out infinite; }
+  @keyframes anomaly{ 0%,100%{ fill-opacity: 0.10; } 50%{ fill-opacity: 0.26; } }
+  .wn-ripple{ fill: none; stroke: var(--joint); stroke-width: 1; transform-box: fill-box; transform-origin: center; animation: ripple 3.2s ease-out infinite; }
+  .wn-ripple.r2{ animation-delay: 1.6s; }
+  @keyframes ripple{ 0%{ transform: scale(1); opacity: 0.55; } 100%{ transform: scale(1.9); opacity: 0; } }
+
+  .dust{ position:absolute; inset:0; z-index:1; pointer-events:none; overflow:hidden; }
+  .dust span{
+    position:absolute; width:2px; height:2px; border-radius:50%;
+    background: var(--accent); opacity:0.4;
+    animation: drift 14s linear infinite;
+  }
+  @keyframes drift{ from{ transform: translateY(10vh) translateX(0); } to{ transform: translateY(-110vh) translateX(30px); } }
+
+  @media (prefers-reduced-motion: reduce){
+    .joint-dot, .route-path, .wn-tip, .wn-needle, .wn-anomaly, .wn-ripple, .dust span, .chrome .dot{ animation: none !important; }
+    .wenner-particle{ display: none; }
+  }
+
+  /* ---------- Section 5: specs ---------- */
+  .specs-wrap{ width:100%; max-width: 860px; margin: 0 auto; padding: 0 8vw; position:relative; z-index:5; }
+  @media (max-width: 720px){ .specs-wrap{ padding: 0 24px; } }
+  .specs-head{ margin-bottom: 40px; }
+  .specs-head h2{ font-size: clamp(26px,4vw,36px); margin:0 0 8px; overflow:visible; }
+  .specs-head p{ font-family: var(--font-mono); font-size: 13px; color: var(--ink-dim); margin:0; }
+  .specs-grid{ display:grid; grid-template-columns: 1fr 1fr; gap: 0 48px; font-family: var(--font-mono); font-size: 13.5px; }
+  @media (max-width: 640px){ .specs-grid{ grid-template-columns: 1fr; } }
+  .specs-grid dl{ margin:0; }
+  .specs-grid .row{ display:flex; justify-content:space-between; gap: 16px; padding: 13px 0; border-bottom: 1px solid var(--line); transition: border-color 0.3s; }
+  .specs-grid .row:hover{ border-color: var(--accent); }
+  .specs-grid .row dt{ color: var(--ink-dim); }
+  .specs-grid .row dd{ margin:0; color: var(--ink); text-align:right; }
+
+  /* ---------- Section 6: closing ---------- */
+  .closing{ text-align:center; justify-content:center; }
+  .closing .story-copy{ max-width: 760px; padding: 0 8vw; margin: 0 auto; }
+  .closing h2{ font-size: clamp(28px,5.4vw,48px); overflow:visible; }
+
+  /* ---------- Section 7: sponsors ---------- */
+  .sponsors{ align-items: flex-start; padding-top: 10vh; padding-bottom: 0; }
+  .sponsors-wrap{ width:100%; max-width: 860px; margin: 0 auto; padding: 0 8vw; position:relative; z-index:5; }
+  @media (max-width: 720px){ .sponsors-wrap{ padding: 0 24px; } }
+  .sponsors h2{ font-size: clamp(24px,3.6vw,34px); margin: 0 0 34px; overflow:visible; max-width: 520px; line-height:1.2; }
+  .tier-list{ display:flex; flex-direction:column; margin-bottom: 8vh; }
+  .tier-row{
+    display:grid; grid-template-columns: 160px 140px 1fr;
+    gap: 20px; align-items:baseline;
+    padding: 22px 0; border-top: 1px solid var(--line);
+  }
+  .tier-list .tier-row:last-child{ border-bottom: 1px solid var(--line); }
+  @media (max-width: 640px){
+    .tier-row{ grid-template-columns: 1fr; gap: 6px; padding: 18px 0; }
+  }
+  .tier-row .tier-name{ font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+  .tier-row.platinum .tier-name{ color: var(--accent); }
+  .tier-row .tier-price{ font-family: var(--font-mono); font-size: 13px; color: var(--ink-dim); }
+  .tier-row .tier-desc{ font-size: 13.5px; color: var(--ink-dim); line-height:1.55; max-width: 480px; }
+
+  .sponsor-foot{
+    position:absolute; bottom: 0; left:0; right:0; z-index:5;
+    padding: 22px 8vw 22px; border-top: 1px solid var(--line);
+    display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap: 8px 24px;
+    font-family: var(--font-mono); color: var(--ink-dim);
+    background: linear-gradient(rgba(7,9,10,0), rgba(7,9,10,0.6));
+  }
+  @media (max-width: 720px){ .sponsor-foot{ padding: 18px 24px; flex-direction:column; } }
+  .sponsor-foot .brand-line{ font-size: 12px; }
+  .sponsor-foot .contact-line{ font-size: 10.5px; opacity: 0.75; }
+  .sponsor-foot .contact-line .accent{ opacity: 1; }
+</style>
+</head>
+<body>
+
+<div class="grain"></div>
+
+<div class="chrome">
+  <div class="wordmark"><span class="dot"></span>FELIX</div>
+  <div class="meta">MODEL K1</div>
+</div>
+<div class="dot-nav" id="dotNav">
+  <span class="active"></span><span></span><span></span><span></span><span></span><span></span><span></span>
+</div>
+<div class="counter" id="counter">01 / 06</div>
+
+<div id="scroller">
+
+  <!-- 1: HERO -->
+  <section class="story" data-index="0">
+    <canvas id="hero-canvas"></canvas>
+    <div class="hud">
+      <div class="hud-corner tl"></div>
+      <div class="hud-corner tr"></div>
+      <div class="hud-corner bl"></div>
+      <div class="hud-corner br"></div>
+      <div class="hud-telemetry">
+        GAIT — NOMINAL<br>
+        BAL — 99.2%<br>
+        PWR — 92%
+      </div>
+    </div>
+    <div class="vignette"></div>
+    <div class="story-copy hero-copy">
+      <p class="cap"><span class="bar"></span><span class="hud-status" id="heroStatus">SCANNING MODEL…</span></p>
+      <h2><span class="line">Continuous Tracks</span><span class="line accent">Zero hesitation.</span></h2>
+      <p class="sub">A tracked field robot for ground wheels can't cross — built to traverse caves without waiting for a path to be cleared first.</p>
+    </div>
+  </section>
+
+  <!-- 2: SENSING -->
+  <section class="story" data-index="1">
+    <div class="story-bg">
+      <div class="radar"><canvas id="lidar-canvas" width="1000" height="1000"></canvas></div>
+    </div>
+    <div class="dust" id="dust1"></div>
+    <div class="vignette"></div>
+    <div class="grain-grid"></div>
+    <div class="story-copy">
+      <p class="cap"><span class="bar"></span>SENSING / LDS02RR</p>
+      <h2><span class="line">Scans every wall</span><span class="line accent">of the cave.</span></h2>
+      <p class="sub">The LDS02RR LiDAR Distance Sensor spins a full 360° around FELIX, measuring the distance to every wall, rock and gap — so the cave is mapped before the first move.</p>
+    </div>
+  </section>
+
+  <!-- 3: VISION (replaces RECOVERY) -->
+  <section class="story" data-index="2">
+    <div class="story-bg">
+      <svg class="leg-diagram" viewBox="0 0 520 380" xmlns="http://www.w3.org/2000/svg" style="width:min(68vh,92vw);height:auto;overflow:visible" role="img" aria-label="A Raspberry Pi camera on a robot arm scanning a scene while OpenCV draws detection boxes around a rock, a person and a pipe">
+        <style>
+          .cm-txt{ font-family: var(--font-mono); font-size: 10px; fill: var(--ink-dim); }
+          .cm-txt.hud{ font-size: 8px; }
+          .cm-txt.acc{ fill: var(--accent); }
+          .cm-body{ fill: var(--panel); stroke: var(--ink-dim); stroke-width: 1.5; }
+          .cm-arm{ stroke: var(--ink-dim); stroke-width: 6; stroke-linecap: round; fill: none; }
+          .cm-ribbon{ fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 3 6; animation: cmflow .8s linear infinite; }
+          @keyframes cmflow{ to{ stroke-dashoffset: -9; } }
+ 
+          /* the arm looks around, the camera pans on the wrist */
+          .cm-sway{ transform-origin: 135px 190px; animation: cmsway 7s ease-in-out infinite; }
+          @keyframes cmsway{ 0%,100%{ transform: rotate(-4deg); } 50%{ transform: rotate(4deg); } }
+          .cm-cam{ transform-origin: 215px 150px; animation: cmcam 7s ease-in-out infinite; animation-delay: -1.6s; }
+          @keyframes cmcam{ 0%,100%{ transform: rotate(-5deg); } 50%{ transform: rotate(6deg); } }
+ 
+          .cm-led{ animation: cmblink 1.2s ease-in-out infinite; }
+          @keyframes cmblink{ 0%,100%{ opacity: 1; } 50%{ opacity: .2; } }
+ 
+          /* scan line sweeping the view */
+          .cm-scan{ animation: cmscan 3.6s linear infinite; }
+          @keyframes cmscan{
+            0%{ transform: translateY(0); opacity: 0; }
+            10%{ opacity: 1; }
+            90%{ opacity: 1; }
+            100%{ transform: translateY(184px); opacity: 0; }
+          }
+ 
+          /* OpenCV boxes lock on one after another */
+          .cm-box{ transform-box: fill-box; transform-origin: center; animation: cmlock 7s ease-out infinite both; }
+          .cm-box.b1{ animation-delay: .7s; }
+          .cm-box.b2{ animation-delay: 1.7s; }
+          .cm-box.b3{ animation-delay: 2.7s; }
+          @keyframes cmlock{
+            0%{ opacity: 0; transform: scale(1.18); }
+            7%{ opacity: 1; transform: scale(1); }
+            84%{ opacity: 1; transform: scale(1); }
+            94%,100%{ opacity: 0; transform: scale(1); }
+          }
+ 
+          @media (prefers-reduced-motion: reduce){
+            .cm-sway, .cm-cam, .cm-led, .cm-ribbon, .cm-box{ animation: none !important; }
+            .cm-scan{ display: none; }
+          }
+        </style>
+        <defs>
+          <clipPath id="cmClip"><rect x="350" y="58" width="150" height="184"/></clipPath>
+          <linearGradient id="cmBeam" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#6FF3D9" stop-opacity="0.24"/>
+            <stop offset="1" stop-color="#6FF3D9" stop-opacity="0.03"/>
+          </linearGradient>
+          <linearGradient id="cmTrail" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#6FF3D9" stop-opacity="0"/>
+            <stop offset="1" stop-color="#6FF3D9" stop-opacity="0.18"/>
+          </linearGradient>
+        </defs>
+ 
+        <!-- ===== robot base: tracks, chassis, Raspberry Pi 4 ===== -->
+        <rect class="cm-body" x="12" y="318" width="186" height="26" rx="13"/>
+        <circle cx="30" cy="331" r="6" fill="none" stroke="#8FA09A" stroke-width="1.2"/>
+        <circle cx="180" cy="331" r="6" fill="none" stroke="#8FA09A" stroke-width="1.2"/>
+        <rect class="cm-body" x="20" y="296" width="170" height="26" rx="4"/>
+        <rect x="32" y="272" width="76" height="24" rx="2" fill="#10161A" stroke="#6FF3D9" stroke-width="1.4"/>
+        <rect x="38" y="277" width="12" height="10" fill="none" stroke="#6FF3D9" stroke-opacity="0.6" stroke-width="1"/>
+        <text class="cm-txt acc" x="80" y="288" text-anchor="middle">RPi 4</text>
+        <text class="cm-txt" x="20" y="362">RASPBERRY PI 4</text>
+ 
+        <!-- arm mount + lower arm -->
+        <rect class="cm-body" x="122" y="290" width="26" height="6" rx="1"/>
+        <line class="cm-arm" x1="135" y1="286" x2="135" y2="190"/>
+        <text class="cm-txt" x="116" y="248" text-anchor="end">ARM</text>
+ 
+        <!-- camera ribbon (CSI): Pi → camera, data flowing -->
+        <path class="cm-ribbon" d="M108 284 H124 V190"/>
+ 
+        <!-- ===== upper arm + camera (looks around) ===== -->
+        <g class="cm-sway">
+          <path class="cm-ribbon" d="M124 190 L222 141"/>
+          <line class="cm-arm" x1="135" y1="190" x2="215" y2="150"/>
+ 
+          <g class="cm-cam">
+            <!-- field of view -->
+            <polygon points="280,150 350,58 350,242" fill="url(#cmBeam)" stroke="#6FF3D9" stroke-opacity="0.28" stroke-dasharray="3 5"/>
+            <!-- camera module -->
+            <rect class="cm-body" x="222" y="134" width="46" height="32" rx="4"/>
+            <rect class="cm-body" x="268" y="141" width="8" height="18" rx="2"/>
+            <circle cx="278" cy="150" r="7" fill="#07090A" stroke="#6FF3D9" stroke-width="1.5"/>
+            <circle cx="278" cy="150" r="2.4" fill="#6FF3D9"/>
+            <circle class="cm-led" cx="232" cy="141" r="2" fill="#6FF3D9"/>
+            <text class="cm-txt" x="222" y="126">PI CAM</text>
+          </g>
+ 
+          <circle cx="215" cy="150" r="6" fill="#FF8A4C" class="joint-dot j3"/>
+        </g>
+ 
+        <circle cx="135" cy="286" r="7" fill="#FF8A4C" class="joint-dot j1"/>
+        <circle cx="135" cy="190" r="7" fill="#FF8A4C" class="joint-dot j2"/>
+ 
+        <!-- ===== what the camera sees ===== -->
+        <rect x="350" y="58" width="150" height="184" fill="#6FF3D9" fill-opacity="0.03" stroke="rgba(242,245,242,0.12)"/>
+        <g fill="none" stroke="#6FF3D9" stroke-width="1.5" opacity="0.8">
+          <path d="M350 76 V58 H368"/><path d="M482 58 H500 V76"/>
+          <path d="M350 224 V242 H368"/><path d="M482 242 H500 V224"/>
+        </g>
+        <text class="cm-txt hud acc" x="374" y="72">OPENCV / DETECT</text>
+        <text class="cm-txt hud" x="480" y="72" text-anchor="end">30 FPS</text>
+        <circle class="cm-led" cx="372" cy="233" r="2.5" fill="#FF8A4C"/>
+        <text class="cm-txt hud" x="380" y="236">LIVE</text>
+ 
+        <!-- objects in the scene -->
+        <polygon points="372,200 388,182 412,186 420,206 402,218 378,216" fill="#FF8A4C" fill-opacity="0.12" stroke="#FF8A4C" stroke-width="1.2"/>
+        <g fill="none" stroke="#8FA09A" stroke-width="1.6" stroke-linecap="round">
+          <circle cx="398" cy="106" r="6"/>
+          <path d="M398 113 V140 M398 120 L388 132 M398 120 L408 132 M398 140 L391 162 M398 140 L405 162"/>
+        </g>
+        <rect x="452" y="96" width="14" height="112" fill="#F2F5F2" fill-opacity="0.07" stroke="#8FA09A" stroke-width="1.2"/>
+        <path d="M449 112 H469 M449 192 H469" stroke="#8FA09A" stroke-width="1.2"/>
+ 
+        <!-- detection boxes -->
+        <g class="cm-box b1">
+          <rect x="366" y="176" width="60" height="48" fill="#6FF3D9" fill-opacity="0.06" stroke="#6FF3D9" stroke-width="1.2"/>
+          <text class="cm-txt hud acc" x="366" y="172">ROCK 0.94</text>
+        </g>
+        <g class="cm-box b2">
+          <rect x="380" y="94" width="36" height="74" fill="#6FF3D9" fill-opacity="0.06" stroke="#6FF3D9" stroke-width="1.2"/>
+          <text class="cm-txt hud acc" x="380" y="90">PERSON 0.91</text>
+        </g>
+        <g class="cm-box b3">
+          <rect x="444" y="90" width="30" height="124" fill="#6FF3D9" fill-opacity="0.06" stroke="#6FF3D9" stroke-width="1.2"/>
+          <text class="cm-txt hud acc" x="444" y="86">PIPE 0.89</text>
+        </g>
+ 
+        <!-- scan line -->
+        <g clip-path="url(#cmClip)">
+          <g class="cm-scan">
+            <rect x="350" y="34" width="150" height="24" fill="url(#cmTrail)"/>
+            <rect x="350" y="57" width="150" height="1.6" fill="#6FF3D9"/>
+          </g>
+        </g>
+      </svg>
+    </div>
+    <div class="dust" id="dust2"></div>
+    <div class="vignette"></div>
+    <div class="grain-grid"></div>
+    <div class="story-copy">
+      <p class="cap"><span class="bar"></span>VISION / PI CAMERA</p>
+      <h2><span class="line">An eye on an arm.</span><span class="line accent">Detects all it sees.</span></h2>
+      <p class="sub">A Raspberry Pi 4 runs OpenCV on the live feed from a Pi Camera. Mounted on an adjustable arm, it looks up, down and around — and detects everything it sees.</p>
+    </div>
+  </section>
+ 
+
+  <!-- 4: AUTONOMY -->
+ <section class="story" data-index="3">
+    <div class="story-bg">
+      <svg class="route-diagram" viewBox="0 0 567 319" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Wenner array: four electrodes driven into the ground, wired with two cables" style="overflow:visible">
+  <!-- ground line -->
+  <line x1="40" y1="254" x2="547" y2="254" stroke="#8FA09A" stroke-opacity="0.55" stroke-width="5" stroke-linecap="round"/>
+  <!-- cables -->
+  <path d="M16 16 C 70 16, 90 94, 147 94 L 253 94" fill="none" stroke="#6FF3D9" stroke-width="3.5" stroke-linecap="round"><animate attributeName="d" dur="6s" begin="0s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.1;0.3;0.85;1" keySplines="0 0 1 1;0.5 0 0.3 1;0 0 1 1;0.5 0 0.3 1" values="M16 16 C 70 16, 90 34, 147 34 L 253 34;M16 16 C 70 16, 90 34, 147 34 L 253 34;M16 16 C 70 16, 90 94, 147 94 L 253 94;M16 16 C 70 16, 90 94, 147 94 L 253 94;M16 16 C 70 16, 90 34, 147 34 L 253 34"/></path>
+  <path d="M16 36 C 70 36, 90 108, 147 108" fill="none" stroke="#F2F5F2" stroke-width="3.5" stroke-linecap="round"><animate attributeName="d" dur="6s" begin="0s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.1;0.3;0.85;1" keySplines="0 0 1 1;0.5 0 0.3 1;0 0 1 1;0.5 0 0.3 1" values="M16 36 C 70 36, 90 48, 147 48;M16 36 C 70 36, 90 48, 147 48;M16 36 C 70 36, 90 108, 147 108;M16 36 C 70 36, 90 108, 147 108;M16 36 C 70 36, 90 48, 147 48"/></path>
+  <path d="M333 108 L 439 108" fill="none" stroke="#F2F5F2" stroke-width="3.5" stroke-linecap="round"><animate attributeName="d" dur="6s" begin="0.3s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.1;0.3;0.85;1" keySplines="0 0 1 1;0.5 0 0.3 1;0 0 1 1;0.5 0 0.3 1" values="M333 48 L 439 48;M333 48 L 439 48;M333 108 L 439 108;M333 108 L 439 108;M333 48 L 439 48"/></path>
+  <!-- rods (they lift, drive into the soil, lift again) -->
+  <g>
+    <animateTransform attributeName="transform" type="translate" dur="6s" begin="0s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.1;0.3;0.85;1" keySplines="0 0 1 1;0.5 0 0.3 1;0 0 1 1;0.5 0 0.3 1" values="0 -60;0 -60;0 0;0 0;0 -60"/>
+    <line x1="147" y1="94" x2="147" y2="290" stroke="#FF8A4C" stroke-width="8" stroke-linecap="round"/>
+    <circle cx="147" cy="94" r="6" fill="#6FF3D9"/>
+  </g>
+  <g>
+    <animateTransform attributeName="transform" type="translate" dur="6s" begin="0s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.1;0.3;0.85;1" keySplines="0 0 1 1;0.5 0 0.3 1;0 0 1 1;0.5 0 0.3 1" values="0 -60;0 -60;0 0;0 0;0 -60"/>
+    <line x1="253" y1="94" x2="253" y2="290" stroke="#FF8A4C" stroke-width="8" stroke-linecap="round"/>
+    <circle cx="253" cy="94" r="6" fill="#6FF3D9"/>
+  </g>
+  <g>
+    <animateTransform attributeName="transform" type="translate" dur="6s" begin="0.3s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.1;0.3;0.85;1" keySplines="0 0 1 1;0.5 0 0.3 1;0 0 1 1;0.5 0 0.3 1" values="0 -60;0 -60;0 0;0 0;0 -60"/>
+    <line x1="333" y1="108" x2="333" y2="290" stroke="#FF8A4C" stroke-width="8" stroke-linecap="round"/>
+    <circle cx="333" cy="108" r="6" fill="#6FF3D9"/>
+  </g>
+  <g>
+    <animateTransform attributeName="transform" type="translate" dur="6s" begin="0.3s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.1;0.3;0.85;1" keySplines="0 0 1 1;0.5 0 0.3 1;0 0 1 1;0.5 0 0.3 1" values="0 -60;0 -60;0 0;0 0;0 -60"/>
+    <line x1="439" y1="108" x2="439" y2="290" stroke="#FF8A4C" stroke-width="8" stroke-linecap="round"/>
+    <circle cx="439" cy="108" r="6" fill="#6FF3D9"/>
+  </g>
+</svg>
+    </div>
+    <div class="vignette"></div>
+    <div class="grain-grid"></div>
+    <div class="story-copy">
+      <p class="cap"><span class="bar"></span>SCANNING</p>
+      <h2><span class="line">Built in Wenner Array.</span><span class="line accent">See what's underneath you.</span></h2>
+      <p class="sub">FELIX goes to dirt or sand and puts 4 rods in the ground.When the results are in we will see what is underground.</p>
+    </div>
+  </section>
+
+  <!-- 5: SPECS -->
+  <section class="story" data-index="4">
+    <div class="grain-grid"></div>
+    <div class="specs-wrap">
+      <div class="specs-head">
+        <h2>Specifications</h2>
+        <p>K1 CHASSIS / STANDARD CONFIGURATION</p>
+      </div>
+      <div class="specs-grid">
+        <dl>
+          <div class="row"><dt>Weight, unloaded</dt><dd>34 kg</dd></div>
+          <div class="row"><dt>Payload capacity</dt><dd>12 kg</dd></div>
+          <div class="row"><dt>Top speed</dt><dd>1.8 m/s</dd></div>
+          <div class="row"><dt>Max incline</dt><dd>35°</dd></div>
+          <div class="row"><dt>Degrees of freedom</dt><dd>12</dd></div>
+        </dl>
+        <dl>
+          <div class="row"><dt>Runtime</dt><dd>2.4 hrs continuous</dd></div>
+          <div class="row"><dt>Ingress protection</dt><dd>IP67</dd></div>
+          <div class="row"><dt>Operating temp</dt><dd>−20°C to 55°C</dd></div>
+          <div class="row"><dt>Onboard sensing</dt><dd>Lidar, thermal ×2, IMU</dd></div>
+          <div class="row"><dt>Connectivity</dt><dd>Wi-Fi 6, LTE optional</dd></div>
+        </dl>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6: CLOSING -->
+  <section class="story closing" data-index="5">
+    <div class="grain-grid"></div>
+    <div class="story-copy">
+      <h2><span class="line">Built for the places</span><span class="line accent">people can't go.</span></h2>
+    </div>
+  </section>
+
+  <!-- 7: SPONSORS -->
+<section class="story sponsors" data-index="6">
+  <div class="grain-grid"></div>
+  <div class="sponsors-wrap">
+    <p class="cap"><span class="bar"></span>PARTNERS</p>
+    <h2><span class="line">Space reserved for the teams</span><span class="line accent">backing the hardware.</span></h2>
+    <div class="tier-list">
+      
+      <div class="tier-row supporters">
+        <div class="tier-name">Supporters</div>
+        <div class="tier-price">Up to 100€</div>
+        <div class="tier-desc">Invitation to post-competition thank you party. · Unlimited Slots</div>
+      </div>
+
+      <div class="tier-row bronze">
+        <div class="tier-name">Bronze</div>
+        <div class="tier-price">From 250€</div>
+        <div class="tier-desc">Social media tags/ads & thank-you party invitation. · 12 Slots</div>
+      </div>
+
+      <div class="tier-row silver">
+        <div class="tier-name">Silver</div>
+        <div class="tier-price">From 500€</div>
+        <div class="tier-desc">Bronze perks + branding on team hats and banners. · 6 Slots</div>
+      </div>
+
+      <div class="tier-row gold">
+        <div class="tier-name">Gold</div>
+        <div class="tier-price">From 1000€</div>
+        <div class="tier-desc">Silver perks + branding placement on official team shirts. · 3 Slots</div>
+      </div>
+
+      <div class="tier-row platinum">
+        <div class="tier-name">Platinum</div>
+        <div class="tier-price">From 3000€</div>
+        <div class="tier-desc">Gold perks + co-branding (Robotini x You) & front-of-shirt space. · 1 Slot</div>
+      </div>
+
+    </div>
+  </div>
+  <div class="sponsor-foot">
+    <span class="brand-line">ROBOTINI</span>
+    <span class="contact-line">Sponsorship inquiries — <span class="accent">...</span> ... · Skala Lakonias</span>
+  </div>
+</section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script>
+(function(){
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---------- Dust particles ----------
+  [['dust1',18],['dust2',14]].forEach(function(pair){
+    var el = document.getElementById(pair[0]);
+    if(!el || reduceMotion) return;
+    for(var i=0;i<pair[1];i++){
+      var s = document.createElement('span');
+      s.style.left = (Math.random()*100) + '%';
+      s.style.animationDuration = (10 + Math.random()*10) + 's';
+      s.style.animationDelay = (Math.random()*-14) + 's';
+      s.style.opacity = (0.15 + Math.random()*0.35).toFixed(2);
+      el.appendChild(s);
+    }
+  });
+
+  // ---------- Hero 3D robot (FELIX model) ----------
+  var mouseX = 0, mouseY = 0;
+  window.addEventListener('mousemove', function(e){
+    mouseX = (e.clientX / window.innerWidth) - 0.5;
+    mouseY = (e.clientY / window.innerHeight) - 0.5;
+  });
+
+  try{
+    var canvas = document.getElementById('hero-canvas');
+    var heroSection = canvas.parentElement;
+    var statusEl = document.getElementById('heroStatus');
+    var W = heroSection.clientWidth, H = heroSection.clientHeight;
+
+    var scene = new THREE.Scene();
+    var camera = new THREE.PerspectiveCamera(38, W/H, 0.1, 100);
+
+    var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(W, H);
+    renderer.localClippingEnabled = true;
+
+    var key = new THREE.DirectionalLight(0xffffff, 1.25);
+    key.position.set(4, 6, 3);
+    scene.add(key);
+    var fill = new THREE.DirectionalLight(0x6FF3D9, 0.55);
+    fill.position.set(-4, 2, -3);
+    scene.add(fill);
+    var amb = new THREE.AmbientLight(0x9aa8a2, 0.6);
+    scene.add(amb);
+    var rim = new THREE.DirectionalLight(0xFF8A4C, 0.45);
+    rim.position.set(-2, 1.2, -4);
+    scene.add(rim);
+    var under = new THREE.DirectionalLight(0x6FF3D9, 0.25);
+    under.position.set(2, -3, 2);
+    scene.add(under);
+
+    // ----- load the FELIX model from felix.glb (same folder as this page) -----
+    var MODEL_URL = 'felix.glb';
+    var modelH = 1.78;              // refined once the model is measured
+    var modelReady = false;
+    var introStart = 0;
+
+    var clipPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 0);   // keeps everything below the plane
+    var feMat = new THREE.MeshStandardMaterial({
+      color: 0x7d8d88, metalness: 0.2, roughness: 0.5,
+      clippingPlanes: [clipPlane]
+    });
+    var robot = new THREE.Group();
+    scene.add(robot);
+
+    new THREE.GLTFLoader().load(MODEL_URL, function(gltf){
+      var src = null;
+      gltf.scene.traverse(function(o){ if(!src && o.isMesh) src = o; });
+      if(!src){ if(statusEl) statusEl.textContent = 'MODEL FILE HAS NO MESH'; return; }
+
+      var geo = src.geometry;
+      if(geo.attributes.color) geo.deleteAttribute('color');
+      if(!geo.attributes.normal) geo.computeVertexNormals();   // crisp per-face normals
+      geo.computeBoundingBox();
+
+      // centre on X/Z, sit on the grid, scale to ~3.4 units long
+      var bb = geo.boundingBox;
+      var size = new THREE.Vector3(); bb.getSize(size);
+      var SCALE = 3.4 / Math.max(size.x, size.y, size.z);
+      modelH = size.y * SCALE;
+
+      var felix = new THREE.Mesh(geo, feMat);
+      felix.scale.setScalar(SCALE);
+      felix.position.set(-(bb.min.x + size.x/2) * SCALE, -bb.min.y * SCALE + 0.03, -(bb.min.z + size.z/2) * SCALE);
+      robot.add(felix);
+
+      modelReady = true;
+      if(reduceMotion){ finishIntro(); }
+      else { introStart = clock.getElapsedTime(); }
+    }, undefined, function(err){
+      console.error('Could not load ' + MODEL_URL, err);
+      if(statusEl) statusEl.textContent = 'MODEL NOT FOUND — serve felix.glb next to this page';
+    });
+
+    var grid = new THREE.GridHelper(9, 36, 0x33403C, 0x33403C);
+    grid.position.y = 0.02;
+    grid.material.opacity = 0.22;
+    grid.material.transparent = true;
+    scene.add(grid);
+
+    var pool = new THREE.Mesh(
+      new THREE.CircleGeometry(2.4, 48),
+      new THREE.MeshBasicMaterial({ color: 0x6ff3d9, transparent:true, opacity:0.05 })
+    );
+    pool.rotation.x = -Math.PI/2;
+    pool.position.y = 0.01;
+    scene.add(pool);
+
+    // ----- entrance: cyan scan plane sweeps up and builds the robot -----
+    var scanGroup = new THREE.Group();
+    var scanFill = new THREE.Mesh(
+      new THREE.PlaneGeometry(4.6, 3.2),
+      new THREE.MeshBasicMaterial({ color: 0x6ff3d9, transparent:true, opacity:0.16, side: THREE.DoubleSide, depthWrite:false, blending: THREE.AdditiveBlending })
+    );
+    scanFill.rotation.x = -Math.PI/2;
+    var scanEdge = new THREE.LineSegments(
+      new THREE.EdgesGeometry(new THREE.PlaneGeometry(4.6, 3.2)),
+      new THREE.LineBasicMaterial({ color: 0x6ff3d9, transparent:true, opacity:0.9 })
+    );
+    scanEdge.rotation.x = -Math.PI/2;
+    scanGroup.add(scanFill); scanGroup.add(scanEdge);
+    scene.add(scanGroup);
+
+    var INTRO_DELAY = 0.35, INTRO_TIME = 2.8;
+    var introDone = false;
+    function easeInOut(x){ return x < 0.5 ? 4*x*x*x : 1 - Math.pow(-2*x + 2, 3)/2; }
+    function finishIntro(){
+      introDone = true;
+      clipPlane.constant = 100;
+      scanGroup.visible = false;
+      if(statusEl){ statusEl.textContent = 'LIVE RENDER / IDLE STANCE'; }
+    }
+    clipPlane.constant = -1;
+
+    function frame(){
+      var aspect = W / H;
+      var radius = Math.max(5.6, 2.15 / (Math.tan(19 * Math.PI/180) * aspect));
+      return radius;
+    }
+    function applyViewOffset(){
+      // nudge the robot right (on wide screens) and up so the hero copy stays clear
+      var aspect = W / H;
+      var ox = aspect > 1.2 ? -W * 0.09 : 0;
+      var oy = H * 0.05;
+      camera.setViewOffset(W, H, ox, oy, W, H);
+    }
+    applyViewOffset();
+
+    function resize(){
+      W = heroSection.clientWidth; H = heroSection.clientHeight;
+      camera.aspect = W/H;
+      camera.updateProjectionMatrix();
+      applyViewOffset();
+      renderer.setSize(W, H);
+    }
+    window.addEventListener('resize', resize);
+
+    // don't burn GPU while the hero is off-screen
+    var heroVisible = true;
+    if('IntersectionObserver' in window){
+      new IntersectionObserver(function(entries){ heroVisible = entries[0].isIntersecting; },
+        { root: document.getElementById('scroller'), threshold: 0 }).observe(heroSection);
+    }
+
+    var clock = new THREE.Clock();
+    var curMouseX = 0, curMouseY = 0;
+
+    function animate(){
+      requestAnimationFrame(animate);
+      if(!heroVisible) return;
+      var t = clock.getElapsedTime();
+
+      scanGroup.visible = modelReady && !introDone;
+      if(modelReady && !introDone){
+        var p = Math.min(Math.max((t - introStart - INTRO_DELAY) / INTRO_TIME, 0), 1);
+        var y = -0.05 + easeInOut(p) * (modelH + 0.25);
+        clipPlane.constant = y;
+        scanGroup.position.y = y;
+        scanFill.material.opacity = 0.16 * (1 - Math.max(0, (p - 0.85) / 0.15));
+        scanEdge.material.opacity = 0.9 * (1 - Math.max(0, (p - 0.85) / 0.15));
+        if(p >= 1) finishIntro();
+      }
+
+      if(!reduceMotion){
+        curMouseX += (mouseX - curMouseX) * 0.04;
+        curMouseY += (mouseY - curMouseY) * 0.04;
+
+        var angle = 0.9 + t * 0.16 + curMouseX * 0.6;
+        var radius = frame();
+        camera.position.x = Math.sin(angle) * radius;
+        camera.position.z = Math.cos(angle) * radius;
+        camera.position.y = 2.2 + Math.sin(t*0.4)*0.08 - curMouseY*0.8;
+        camera.lookAt(0, modelH * 0.5, 0);
+      } else {
+        camera.position.set(Math.sin(0.9) * frame(), 2.2, Math.cos(0.9) * frame());
+        camera.lookAt(0, modelH * 0.5, 0);
+      }
+      renderer.render(scene, camera);
+    }
+    animate();
+  } catch(e){ console.error('Robot render failed:', e); }
+
+  // ---------- Section 2: LiDAR scan animation ----------
+  (function(){
+    var cv = document.getElementById('lidar-canvas');
+    if(!cv) return;
+    var ctx = cv.getContext('2d');
+    var S = cv.width / 400;            // work in a 400x400 space
+    var CX = 200, CY = 200, MAX = 190;
+    var N = 360, SPEED = 110;          // samples per turn, degrees per second
+
+    // top-down environment: a cave wall (type 0) with a few rocks (type 1)
+    var polys = [
+      { t:0, p:[[40,90],[95,40],[170,55],[230,30],[310,60],[360,120],[345,200],[372,265],[320,335],[240,350],[190,320],[120,352],[55,300],[70,220],[28,160]] },
+      { t:1, p:[[238,138],[262,142],[266,164],[244,170]] },
+      { t:1, p:[[122,232],[148,236],[152,258],[126,262]] },
+      { t:1, p:[[262,262],[290,270],[284,294],[258,286]] }
+    ];
+    var segs = [];
+    polys.forEach(function(o){
+      for(var i = 0; i < o.p.length; i++){
+        var a = o.p[i], b = o.p[(i+1) % o.p.length];
+        segs.push([a[0], a[1], b[0], b[1], o.t]);
+      }
+    });
+
+    // cast one ray per degree against the environment
+    var dist = new Float32Array(N), kind = new Uint8Array(N);
+    for(var i = 0; i < N; i++){
+      var th = i * Math.PI / 180, dx = Math.cos(th), dy = Math.sin(th), best = MAX + 1, bk = 0;
+      for(var s = 0; s < segs.length; s++){
+        var g = segs[s], ex = g[2] - g[0], ey = g[3] - g[1];
+        var den = dx*ey - dy*ex;
+        if(Math.abs(den) < 1e-9) continue;
+        var qx = g[0] - CX, qy = g[1] - CY;
+        var tt = (qx*ey - qy*ex) / den, uu = (qx*dy - qy*dx) / den;
+        if(tt > 0.5 && uu >= 0 && uu <= 1 && tt < best){ best = tt; bk = g[4]; }
+      }
+      dist[i] = best > MAX ? MAX : best + (Math.random() - 0.5) * 1.2;
+      kind[i] = bk;
+    }
+
+    var START = 270;                   // beam starts pointing up
+    var total = 0, last = 0, running = false;
+
+    function wedge(ang, span, alpha){
+      if(span < 2) return;
+      ctx.beginPath();
+      ctx.moveTo(CX*S, CY*S);
+      var steps = Math.floor(span);
+      for(var k = 0; k <= steps; k++){
+        var a = ang - span + span * k / steps;
+        var idx = ((Math.floor(a) % N) + N) % N;
+        var r = a * Math.PI / 180;
+        ctx.lineTo((CX + Math.cos(r) * dist[idx]) * S, (CY + Math.sin(r) * dist[idx]) * S);
+      }
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(111,243,217,' + alpha + ')';
+      ctx.fill();
+    }
+
+    function draw(){
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      var ang = (START + total) % 360;
+      var aIdx = Math.floor(ang) % N;
+
+      // range rings + axes
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(242,245,242,0.10)';
+      [60, 120, 180].forEach(function(r){
+        ctx.beginPath(); ctx.arc(CX*S, CY*S, r*S, 0, Math.PI*2); ctx.stroke();
+      });
+      ctx.beginPath();
+      ctx.moveTo(20*S, CY*S); ctx.lineTo(380*S, CY*S);
+      ctx.moveTo(CX*S, 20*S); ctx.lineTo(CX*S, 380*S);
+      ctx.stroke();
+
+      // scan wedge trailing the beam
+      wedge(ang, Math.min(30, total), 0.05);
+      wedge(ang, Math.min(16, total), 0.06);
+      wedge(ang, Math.min(7, total), 0.08);
+
+      // point cloud: bright where the beam just passed, fading to a faint memory
+      for(var i = 0; i < N; i++){
+        var off = (i - START + 360) % 360;
+        if(total < off) continue;
+        var since = (((total - off) % 360) + 360) % 360;
+        var al = 0.16 + 0.84 * Math.pow(1 - since / 360, 2.2);
+        var r = i * Math.PI / 180;
+        ctx.fillStyle = (kind[i] ? 'rgba(255,138,76,' : 'rgba(111,243,217,') + al.toFixed(3) + ')';
+        ctx.beginPath();
+        ctx.arc((CX + Math.cos(r) * dist[i]) * S, (CY + Math.sin(r) * dist[i]) * S, 1.5 * S, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // the beam itself
+      var br = ang * Math.PI / 180;
+      var bx = (CX + Math.cos(br) * dist[aIdx]) * S, by = (CY + Math.sin(br) * dist[aIdx]) * S;
+      ctx.strokeStyle = 'rgba(111,243,217,0.85)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(CX*S, CY*S); ctx.lineTo(bx, by); ctx.stroke();
+      ctx.fillStyle = '#F2F5F2';
+      ctx.beginPath(); ctx.arc(bx, by, 2.4 * S, 0, Math.PI * 2); ctx.fill();
+
+      // robot (top view) with the sensor puck on top
+      ctx.save();
+      ctx.translate(CX*S, CY*S);
+      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = 'rgba(143,160,154,0.95)';
+      ctx.fillStyle = '#1B2226';
+      ctx.fillRect(-15*S, -12*S, 30*S, 6*S);  ctx.strokeRect(-15*S, -12*S, 30*S, 6*S);
+      ctx.fillRect(-15*S, 6*S, 30*S, 6*S);   ctx.strokeRect(-15*S, 6*S, 30*S, 6*S);
+      ctx.fillStyle = '#10161A';
+      ctx.fillRect(-12*S, -7*S, 24*S, 14*S); ctx.strokeRect(-12*S, -7*S, 24*S, 14*S);
+      ctx.fillStyle = '#07090A';
+      ctx.strokeStyle = '#6FF3D9';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(0, 0, 5.5*S, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(br) * 5.5 * S, Math.sin(br) * 5.5 * S); ctx.stroke();
+      ctx.restore();
+
+      // labels
+      ctx.font = (9.5 * S) + 'px "IBM Plex Mono", monospace';
+      ctx.fillStyle = 'rgba(143,160,154,0.9)';
+      ctx.textAlign = 'left';  ctx.fillText('LDS02RR', 14*S, 24*S);
+      ctx.textAlign = 'right'; ctx.fillText('ANGLE ' + String(Math.round(ang) % 360).padStart(3, '0') + '°', 386*S, 24*S);
+    }
+
+    function loop(now){
+      if(!running) return;
+      var dt = Math.min((now - last) / 1000, 0.05);
+      last = now;
+      total += dt * SPEED;
+      draw();
+      requestAnimationFrame(loop);
+    }
+    function start(){ if(running) return; running = true; last = performance.now(); requestAnimationFrame(loop); }
+    function stop(){ running = false; }
+
+    draw();
+    if(reduceMotion){ total = 360; draw(); }
+    else if('IntersectionObserver' in window){
+      new IntersectionObserver(function(entries){ entries[0].isIntersecting ? start() : stop(); },
+        { root: document.getElementById('scroller'), threshold: 0.05 }).observe(cv);
+    } else { start(); }
+  })();
+
+  // ---------- Scroll choreography ----------
+  var scroller = document.getElementById('scroller');
+  var sections = Array.prototype.slice.call(document.querySelectorAll('.story'));
+  var dots = Array.prototype.slice.call(document.querySelectorAll('#dotNav span'));
+  var counter = document.getElementById('counter');
+  var total = sections.length;
+  var ticking = false;
+
+  function easeOutCubic(x){ return 1 - Math.pow(1-x, 3); }
+
+  function update(){
+    var viewportH = scroller.clientHeight;
+    var scrollCenter = scroller.scrollTop + viewportH/2;
+    var closestIdx = 0, closestDist = Infinity;
+
+    sections.forEach(function(sec, i){
+      var top = sec.offsetTop;
+      var center = top + sec.clientHeight/2;
+      var dist = Math.abs(scrollCenter - center);
+      if(dist < closestDist){ closestDist = dist; closestIdx = i; }
+
+      var raw = 1 - Math.min(dist / viewportH, 1);
+      var progress = easeOutCubic(raw);
+      var copy = sec.querySelector('.story-copy');
+      var bg = sec.querySelector('.story-bg');
+      if(!reduceMotion){
+        if(copy){
+          copy.style.opacity = (0.15 + progress*0.85).toFixed(3);
+          copy.style.transform = 'translateY(' + ((1-progress)*26) + 'px)';
+          var lines = copy.querySelectorAll('h2 .line');
+          lines.forEach(function(ln, li){
+            var lp = Math.max(0, Math.min(1, (progress - li*0.12) / 0.7));
+            ln.style.clipPath = 'inset(0 0 ' + ((1-lp)*100) + '% 0)';
+            ln.style.transform = 'translateY(' + ((1-lp)*18) + 'px)';
+          });
+        }
+        if(bg){
+          var scale = 1 + (1-progress)*0.08;
+          bg.style.transform = 'scale(' + scale.toFixed(3) + ') rotateX(' + ((1-progress)*4) + 'deg)';
+        }
+      }
+    });
+
+    dots.forEach(function(d, i){ d.classList.toggle('active', i === closestIdx); });
+    counter.textContent = String(closestIdx+1).padStart(2,'0') + ' / ' + String(total).padStart(2,'0');
+    ticking = false;
+  }
+
+  scroller.addEventListener('scroll', function(){
+    if(!ticking){ requestAnimationFrame(update); ticking = true; }
+  });
+  update();
+})();
+</script>
+
+</body>
+</html>
